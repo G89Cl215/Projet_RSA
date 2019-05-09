@@ -1,3 +1,5 @@
+\p 1000
+
 generate_key(bits=512) = {
   p = nextprime(random(2 ^ bits));
   q = nextprime(random(2 ^ bits));
@@ -17,12 +19,17 @@ generate_key(bits=512) = {
   [pub, priv];
   }
 
-generate_Wiener_key(bits=512) = { \\ 512 etant la taille de p et q (donc 1024 pour N)
+generate_Wiener_key(bits=512, c=1) = { \\ 512 etant la taille de p et q (donc 1024 pour N)
+  \\setrand(extern("echo $RANDOM"));
+  until((p < q && q < 2 * p) || (q < p && p < 2 * q), 
   p = nextprime(random(2 ^ bits));
-  q = nextprime(random(2 ^ bits));
+  q = nextprime(random(2 ^ bits)));
   N = p * q;
   phi = (p-1)*(q-1);
-  borne =  floor(1/3 * (2 ^ (bits/2))) * 10; \\Borne de l'Hypothese du thm de Wiener
+  borne =  floor(1/3 * (N ^ (1/4))) * c; \\Borne de l'Hypothese du thm de Wiener
+                                            \\avec facteur c=100 -------> 2%
+					    \\avec facteur c=50 -------> 4%
+					    \\avec facteur c=10 -------> 20%
   until(gcd(d,phi)==1 && d < borne, d = random(borne));  \\ On genere d abord d qui correspond au thm de wiener ensuite e
   \\while((gcd(d, phi) != 1 || d > borne), d = random(borne));
   e = d^-1 % phi;
@@ -36,7 +43,6 @@ generate_Wiener_key(bits=512) = { \\ 512 etant la taille de p et q (donc 1024 po
   priv = [N, d];                               \\cle privee
   [pub, priv];
   }
-
 
 
 encrypt(message, pub_key) = {
@@ -83,58 +89,155 @@ Fract_to_Reduites(l) = { \\ Donne la liste des reduites d un developpement en fr
 
 Wiener_Attack(pub_key) = {
 
-		       tester = [11, 2, 3, 4, 5, 6, 7, 8, 9, 10] ; \\Vecteur de test
+		       \\tester = [11, 2, 3, 4, 5, 6, 7, 8, 9, 10] ;
+           \\Vecteur de test aléatoire avec des nombres > 10 et < 10^50
+           tester = [];
+           for(i = 1, 10, tester = concat(tester, random(10^50) + 10));
 		       found = 0;
 		       N = pub_key[1];
 		       e = pub_key[2];
 		       f = Fract_cont(e, N);       \\Fractions continue de e/N
-                       RED = Fract_to_Reduites(f); \\ Reduites de e/N
+           RED = Fract_to_Reduites(f); \\ Reduites de e/N
 		       for(i = 1, length(RED),
-                          k = RED[i][1]; d = RED[i][2];         \\ K et D potentiels
-			  \\print("testing d = ", d);
-                          if(k != 0,                           \\1 ere verification
-                                 if((e * d - 1)%k == 0,             \\k verifie bien le fait qu il soit un coeff de bezout
-				 phi = (e * d - 1)\k;
-				 if((e * d) % phi == 1, \\inutile
-				   key_priv = [N, d];
-				   if(tester == decrypt(encrypt(tester, pub_key), key_priv),
-		                     \\print("un bon k = ", k);
-				   
-
-
-                                   somme = N - phi + 1;            \\ P + Q
-                                 \\Je developperais pour essayer d avoir p et q car ici on a la somme et le produit
-                                   found = 1;
-				   break;
-           )
-	   )
-	   )
-           )
-           );
-	   if(found == 1, d, 0);
+                    k = RED[i][1]; d = RED[i][2];         \\ K et D potentiels
+			              \\print("testing d = ", d);
+                    if(k != 0,                           \\1 ere verification
+                        if((e * d - 1)%k == 0,             \\k verifie bien le fait qu il soit un coeff de bezout
+				                phi = (e * d - 1)\k;
+				                if((e * d) % phi == 1, \\inutile
+				                    key_priv = [N, d];
+				                    if(tester == decrypt(encrypt(tester, pub_key), key_priv),
+		                            \\print("un bon k = ", k);
+				                         print("phi = ", phi);
+                                somme = N - phi + 1;            \\ P + Q
+                                \\P et Q sont donnes par les racines du Polynome P_
+                                P_ = x^2 + somme * x + N;
+				                        R = polroots(P_);
+				                        P = floor(real(R[1]));
+				                        Q = floor(real(R[2]));
+				                        if(P * Q == N, print("key cracked"); print("p = ", P);print("Q = ", Q));
+                                found = 1;
+				                        break;
+                 )
+	            )
+	         )
+        )
+    );
+	  if(found == 1, d, 0);
 
 
 }
 
 
-Wiener_Attack_test(n=1000) = {
+Wiener_Attack_test(n=1000, c=1) = {
 		     count = 0.0;
-         gettime();
+                     gettime();
 		     for(i = 1, n,
-		         K = generate_Wiener_key();
+		         K = generate_Wiener_key(512, c);
 		     	 D = K[2][2];
 			 d = Wiener_Attack(K[1]);
-			 if(d == D, print(d);print("d trouvé");count++)
+			 if(d == D, print(d);print("d trouvé");count++, print("clef non trouvee");print(D))
 			 );
          t = gettime() + 0.0;
+	 res = floor((count/n) * 100);
          print("     \n bilan des attaques : \n\n");
 		     print("    ", n, " attaques effectuees");
          print("    ", floor(count), " clefs privées trouvées");
 		     print("    ", floor((count/n) * 100), "% taux reussite des attaques");
          print("    temps total ", floor(t), " ms");
          print("    ", floor(t/n), " ms/attaque");
-
+	 res;
 		     }
+
+
+		     
+\\
+\\Partie Coppesmith
+\\
+
+G_u_v(P, N, u, v, m) = {
+   G = N^(m-v) * x^u * P^v;
+   G;	 
+}
+
+
+Coppersmith_Matrix(P, N, m=1) = {
+       d = poldegree(P);
+       eps = 1/2 * log(2)/log(N);
+       X = floor(N^(1/d - eps));
+       u = 0;
+       v = 0;
+       CMP = 1;
+       dim = d * (m+1);
+       M = matrix(dim, dim);
+       P_ = N;
+       
+       for(j = 1, m+1, for(i = 1, d, \\i = u, j = v 
+       	     G = G_u_v(P, N, i-1, j-1, m);
+	     \\print("u = ", j-1, " v = ", i-1);
+	     G = subst(G, x, x*X);
+	     \\print(G);
+	     V = Vecrev(Vec(G), dim);
+	     \\G = subst(G, x, x*X);
+	     \\print(V);
+	     \\print("indice = ", (i-1)*(j-1)+1);
+	     for(k = 1, dim, M[CMP, k] = V[k]);
+	     CMP++;
+	   )
+       );
+       M_  = M~ * qflll(M~, 1);
+       \\M_ = M_~;
+       \\M_  = qflll(M);
+       DET = matdet(M);
+       OMEGA = matrank(M);
+       V = [];
+       for(i = 1, matrank(M),
+           for(j = 1, matrank(M),
+	      V = concat(V, M_[matrank(M)-i+1, j]);
+	   );
+	   Q = Polrev(V);
+	   Q_ = subst(Q, x, x*X);
+	   \\if(Norme(V) < 2^(OMEGA/4) * DET ^ (1/OMEGA) , return(Polrev(V)));
+	   if(Norme(Vec(Q)) < N^m / sqrt(OMEGA), return(Q));
+	   V = []
+	   );
+	   
+}
+Norme(V) = {
+  s = 0;
+  for(i = 1, length(V),
+    s += V[i]^2;
+   );
+  return(sqrt(s));
+}
+
+Norme_2(P, N) = {
+  res = 0;
+  X = N ^ (1/poldegree(P));
+  l = Vecrev(P);
+  for(i = 0, poldegree(P),
+   res += (l[i+1] * X^i)^2;
+  );
+  return(sqrt(res));
+
+
+}
+
+small_roots(P, N) = {
+  d = poldegree(P);
+  X = N^(1/d);
+  roots = [];
+  
+
+}
+
+Wiener_Graph(x) = {
+   y = [];
+   for(i = 1, length(x), y = concat(y, Wiener_Attack_test(100, x[i])));
+   plothrawexport("svg", x, y);
+   plotdraw(0);
+   y;
+}
 
 \\Keys = generate_key();
 \\key_pub = Keys[1];
@@ -149,6 +252,6 @@ Wiener_Attack_test(n=1000) = {
 \\print(Fract_cont(e, n));
 \\print(key_pub[1]);
 \\print(Wiener_Attack(key_pub));
-key = generate_Wiener_key();
-pub_key = key[1];
-l = Wiener_Attack(pub_key);
+\\key = generate_Wiener_key();
+\\pub_key = key[1];
+\\l = Wiener_Attack(pub_key);
