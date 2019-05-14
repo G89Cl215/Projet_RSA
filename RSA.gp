@@ -130,13 +130,13 @@ Wiener_Attack(pub_key) = {
 
 
 Wiener_Attack_test(n=1000, c=1) = {
-		     count = 0.0;
-                     gettime();
-		     for(i = 1, n,
-		         K = generate_Wiener_key(512, c);
-		     	 D = K[2][2];
-			 d = Wiener_Attack(K[1]);
-			 if(d == D, print(d);print("d trouvé");count++, print("clef non trouvee");print(D))
+        count = 0.0;
+        gettime();
+        for(i = 1, n,
+		K = generate_Wiener_key(512, c);
+		D = K[2][2];
+	        d = Wiener_Attack(K[1]);
+		if(d == D, print(d);print("d trouvé");count++, print("clef non trouvee");print(D))
 			 );
          t = gettime() + 0.0;
 	 res = floor((count/n) * 100);
@@ -164,7 +164,7 @@ G_u_v(P, N, u, v, m) = {
 Coppersmith_Matrix(P, N, m=1) = {
        d = poldegree(P);
        eps = 1/2 * log(2)/log(N);
-       X = floor(N^(1/d - eps));
+       X = floor(N^(1/d));
        u = 0;
        v = 0;
        CMP = 1;
@@ -176,17 +176,13 @@ Coppersmith_Matrix(P, N, m=1) = {
        	     G = G_u_v(P, N, i-1, j-1, m);
 	     \\print("u = ", j-1, " v = ", i-1);
 	     G = subst(G, x, x*X);
-	     \\print(G);
 	     V = Vecrev(Vec(G), dim);
-	     \\G = subst(G, x, x*X);
-	     \\print(V);
-	     \\print("indice = ", (i-1)*(j-1)+1);
 	     for(k = 1, dim, M[CMP, k] = V[k]);
 	     CMP++;
 	   )
        );
-       M_  = M~ * qflll(M~, 1);
-       \\M_ = M_~;
+       M_  = M~ * qflll(M~);
+       M_ = M_~;
        \\M_  = qflll(M);
        DET = matdet(M);
        OMEGA = matrank(M);
@@ -196,13 +192,63 @@ Coppersmith_Matrix(P, N, m=1) = {
 	      V = concat(V, M_[matrank(M)-i+1, j]);
 	   );
 	   Q = Polrev(V);
-	   Q_ = subst(Q, x, x*X);
+	   Q_ = subst(Q, x, x/X);
 	   \\if(Norme(V) < 2^(OMEGA/4) * DET ^ (1/OMEGA) , return(Polrev(V)));
-	   if(Norme(Vec(Q)) < N^m / sqrt(OMEGA), return(Q));
+	   if(Norme(V) < N^m / sqrt(OMEGA), return(Q_));
+	   \\if(Norme(Vec(Q)) < N^m / sqrt(OMEGA), return(Q_));
 	   V = []
 	   );
 	   
 }
+
+Coppersmith_2(P, N, m=1) = {
+       d = poldegree(P);
+       eps = 1/2 * log(2)/log(N);
+       X = floor(N^(1/d));
+       u = 0;
+       v = 0;
+       CMP = 1;
+       dim = d * (m+1);
+       M = matrix(dim, dim);
+       P_ = N;
+       
+       for(j = 1, m+1, for(i = 1, d, \\i = u, j = v 
+       	     G = G_u_v(P, N, i-1, j-1, m);
+	     \\print("u = ", j-1, " v = ", i-1);
+	     G = subst(G, x, x*X);
+	     V = Vecrev(Vec(G), dim);
+	     for(k = 1, dim, M[CMP, k] = V[k]);
+	     CMP++;
+	   )
+       );
+       M_  = M~ * qflll(M~);
+       M_ = M_~;
+       \\M_  = qflll(M);
+       DET = matdet(M);
+       OMEGA = matrank(M);
+       V = [];
+       for(i = 1, matrank(M),
+           for(j = 1, matrank(M),
+	      V = concat(V, M_[matrank(M)-i+1, j]);
+	      );
+	      Q = Polrev(V);
+	      Q_ = subst(Q, x, x/X);
+	      RACINES = floor(real(polroots(Q_)));
+	      print(RACINES);
+	      r = [];
+	      for(i = 1, #RACINES, 
+	          if(subst(P, x, RACINES[i]) % N == 0, 
+	              print(RACINES[i]);
+	              r = vecsort(r);
+	              if(vecsearch(r, RACINES[i]) == 0, r = concat(r, RACINES[i]))
+	              ));
+
+	      V = []
+	   );
+	   return(r);
+}
+
+
 Norme(V) = {
   s = 0;
   for(i = 1, length(V),
