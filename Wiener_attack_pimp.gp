@@ -11,7 +11,6 @@ generate_Wiener_key(bits = 512, c = 1) =
 		borne =  floor(1/3 * (N ^ (1/4))) * c; \\Borne de l'Hypothese du thm de Wiener
 		until(gcd(d,phi)==1 && d < borne,
 			d = random(borne));  \\ On genere d abord d qui correspond au thm de wiener ensuite e
-				\\while((gcd(d, phi) != 1 || d > borne), d = random(borne));
 		e = d^-1 % phi;
 		pub = [N, e];                                \\cle publique
 		priv = [N, d];                               \\cle privee
@@ -21,12 +20,10 @@ generate_Wiener_key(bits = 512, c = 1) =
 Wiener_Attack_euclide_integre(pub_key) =
 {
 	found = 0;
-	step = 0;
-	quotient = [e\N, 0];
-	reste = [e % N, 0];
-	quotient[2] = N \ reste[1];
-	reste[2] = N % reste[1];
-	print(reste);
+	quotient = [pub_key[2]\pub_key[1], 0];
+	reste = [pub_key[2] % pub_key[1], 0];
+	quotient[2] = pub_key[1] \ reste[1];
+	reste[2] = pub_key[1] % reste[1];
 	num = [quotient[1], quotient[1] * quotient[2] + 1];
 	denum = [1, quotient[2]];
 	while (reste[2] > 0,
@@ -37,7 +34,7 @@ Wiener_Attack_euclide_integre(pub_key) =
 			key_priv = [N, d];
 			somme = N - phi + 1;            \\ P + Q
 			P_ = x^2 - somme * x + N;
-			R = polroots(P_);step = step + 1;
+			R = polroots(P_);
 			P = floor(real(R[2]));
 			Q = floor(real(R[1]));
 			if (P * Q == N,
